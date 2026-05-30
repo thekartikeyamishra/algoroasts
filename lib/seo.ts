@@ -37,6 +37,14 @@ export function buildMetadata({
     description,
     metadataBase: new URL(SITE.url),
     alternates: { canonical },
+    icons: {
+      icon: [
+        { url: '/favicon.ico', sizes: '48x48' },
+        { url: '/favicon-32.png', sizes: '32x32', type: 'image/png' },
+        { url: '/favicon-16.png', sizes: '16x16', type: 'image/png' },
+      ],
+      apple: [{ url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' }],
+    },
     robots: noIndex
       ? { index: false, follow: false }
       : { index: true, follow: true, 'max-image-preview': 'large', 'max-snippet': -1 },
