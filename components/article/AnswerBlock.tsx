@@ -37,11 +37,13 @@ export function Stat({ value, label, source }: { value: string; label: string; s
 
 /** A block of key takeaways — scannable, fact-dense, ideal for AI extraction. */
 export function KeyTakeaways({ items }: { items: string[] }) {
+  const safeItems = items ?? [];
+  if (safeItems.length === 0) return null;
   return (
     <div className="not-prose my-8 rounded-2xl border border-line bg-surface p-6">
       <p className="mb-3 text-xs font-bold uppercase tracking-widest text-faint">Key takeaways</p>
       <ul className="space-y-2">
-        {items.map((item, i) => (
+        {safeItems.map((item, i) => (
           <li key={i} className="flex gap-3 text-muted">
             <span className="mt-0.5 text-brand-500" aria-hidden>▸</span>
             <span>{item}</span>
@@ -57,12 +59,14 @@ export function KeyTakeaways({ items }: { items: string[] }) {
  * FAQ schema is one of the highest-ROI GEO signals for citation.
  */
 export function FAQ({ items }: { items: { question: string; answer: string }[] }) {
+  const safeItems = items ?? [];
+  if (safeItems.length === 0) return null;
   return (
     <section className="not-prose my-10" aria-label="Frequently asked questions">
-      <JsonLd data={faqSchema(items)} />
+      <JsonLd data={faqSchema(safeItems)} />
       <h2 className="mb-4 text-2xl font-bold text-ink">Frequently asked questions</h2>
       <div className="divide-y divide-line rounded-2xl border border-line bg-surface">
-        {items.map((item, i) => (
+        {safeItems.map((item, i) => (
           <details key={i} className="group p-5">
             <summary className="cursor-pointer list-none font-semibold text-ink marker:hidden">
               {item.question}
