@@ -1,0 +1,90 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-jakarta: 'Plus Jakarta Sans', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+
+  /* Semantic theme tokens (LIGHT). Format: "R G B" for rgb(var() / alpha). */
+  --c-ink: 15 23 42;        /* slate-900  — primary text */
+  --c-canvas: 248 250 252;  /* slate-50   — page background */
+  --c-surface: 255 255 255; /* white      — cards / panels */
+  --c-muted: 71 85 105;     /* slate-600  — secondary text */
+  --c-faint: 148 163 184;   /* slate-400  — meta text */
+  --c-line: 226 232 240;    /* slate-200  — borders */
+}
+
+.dark {
+  /* Semantic theme tokens (DARK). */
+  --c-ink: 241 245 249;     /* slate-100 */
+  --c-canvas: 2 6 23;       /* slate-950 */
+  --c-surface: 15 23 42;    /* slate-900 */
+  --c-muted: 148 163 184;   /* slate-400 */
+  --c-faint: 100 116 139;   /* slate-500 */
+  --c-line: 30 41 59;       /* slate-800 */
+  color-scheme: dark;
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    @apply bg-canvas text-ink antialiased transition-colors duration-250;
+    text-rendering: optimizeLegibility;
+  }
+  ::selection {
+    @apply bg-brand/20 text-brand-700 dark:text-brand-200;
+  }
+  /* Anchor offset so deep-linked headings clear the sticky nav */
+  :target {
+    scroll-margin-top: 6rem;
+  }
+  /* Accessible focus ring across the whole app (keyboard users) */
+  :focus-visible {
+    @apply outline-none ring-2 ring-brand-500 ring-offset-2 ring-offset-canvas;
+  }
+}
+
+@layer components {
+  .glass-card {
+    @apply border border-line bg-surface/95 backdrop-blur;
+  }
+  .gradient-text {
+    @apply bg-gradient-to-r from-accent-400 to-brand-400 bg-clip-text text-transparent;
+  }
+  .container-x {
+    @apply mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8;
+  }
+}
+
+@layer utilities {
+  /* Respect users who prefer reduced motion (a11y) */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.001ms !important;
+      transition-duration: 0.001ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+/* rehype-pretty-code: code block theming (always-dark surface, reads well in both themes) */
+pre {
+  @apply overflow-x-auto rounded-xl border border-slate-800 bg-slate-900 p-4 text-sm leading-relaxed;
+}
+code {
+  counter-reset: line;
+}
+code[data-line-numbers] > [data-line]::before {
+  counter-increment: line;
+  content: counter(line);
+  @apply mr-4 inline-block w-4 text-right text-slate-600;
+}
+[data-rehype-pretty-code-figure] {
+  @apply my-6;
+}
