@@ -38,7 +38,7 @@
 - **Problem solved:** Developers no longer have an information deficit — they have a *direction*
   deficit. General AI gives generic, overwhelming lists. Algoroasts synthesizes real market data,
   salary trends, and visual roadmaps into a single actionable directive.
-- **Revenue model:** Advertising only (NO paid subscriptions). Google AdSense from day one,
+- **Revenue model:** Advertising only (NO paid subscriptions). See `docs/LAUNCH_CHECKLIST.md`. Google AdSense from day one,
   graduating to premium programmatic + privacy-first developer ad networks later.
 - **Revenue target:** ≥ $10,000/month, sustained for 10–15 years.
 - **Domain:** `https://algoroasts.com` (apex is canonical; `www` 301-redirects to apex).
@@ -82,8 +82,13 @@ algoroasts/
 │   │   └── [slug]/page.tsx      # Article: MDX render, Answer Block, schema, ads, save, sources, related
 │   ├── category/[slug]/page.tsx # Category landing (one per CATEGORIES entry)
 │   ├── about/page.tsx
-│   ├── roadmaps/page.tsx
-│   └── api/track/               # (reserved for Phase 3 server-side tracking)
+│   ├── roadmaps/page.tsx        # Canonical Skill Roadmaps hub (/category/roadmaps 301s here)
+│   ├── tools/                   # Free calculators (index + contract-vs-full-time-calculator)
+│   ├── invite/page.tsx          # Invite-only early access + app store buttons
+│   ├── privacy|terms|disclaimer|editorial-policy|contact/  # Trust & legal pages (no ads)
+│   ├── llms.txt/route.ts        # Plain-text site map for AI assistants
+│   ├── blog/[slug]/opengraph-image.tsx  # Per-article OG images
+│   └── api/leads/route.ts       # Invite/contact → LEADS_WEBHOOK_URL (stores nothing itself)
 ├── components/
 │   ├── JsonLd.tsx               # <script type="application/ld+json"> injector
 │   ├── layout/{Navbar,Footer}.tsx
@@ -267,3 +272,18 @@ When asked to add or change something:
 
 **Never** introduce a new dependency, env var, or architectural pattern without first proposing it
 and getting confirmation. Default to the simplest solution that fits the map above.
+
+---
+
+## 11. RULES ADDED OCT 2026 (ADSENSE / QUALITY)
+
+1. MDX is rendered with `blockJS: false` (trusted repo content) — without it, `<KeyTakeaways items={...}/>`
+   and `<FAQ items={...}/>` silently render nothing.
+2. Never commit pasted AI chat output. Grep for `[cite`, "Here's", "Copy this" before publishing.
+3. Manual ad units come only from `NEXT_PUBLIC_AD_SLOT_*` env vars; empty → no render. Never place ads
+   next to buttons, inputs or the calculator controls, and never on legal/contact/invite pages.
+4. Never hide content behind JS for animation (no opacity:0 initial states). Motion is transform-only.
+5. App store links live in `SITE.apps`; `null` renders a non-clickable "Coming soon" badge.
+6. Calculators: pure maths in `lib/calc/*` (server-safe), statutory figures only with an official source
+   linked next to the input, worked examples computed from the same engine.
+7. Internal links to categories use `categoryHref()` (roadmaps lives at `/roadmaps`).

@@ -1,158 +1,82 @@
 ---
-title: "The Zero Trust Firewall for AI Agents Securing Claude and Cursor"
-answer: "Granting autonomous AI coding agents unrestricted access to your local filesystem or cloud APIs is a massive security risk. AegisMCP is an open source zero trust security gateway that intercepts dangerous commands and enforces strict financial API budgets before execution."
-description: "Protect your local filesystem, secure your API keys, and stop runaway LLM API costs with AegisMCP, the ultimate zero trust Model Context Protocol proxy for developers."
+title: "Guardrails for AI Coding Agents: Budgets, Blocklists and Human Approval (with an Open-Source MCP Example)"
+answer: "Treat an AI coding agent like an untrusted contractor with your keyboard: give it the fewest tools and folders possible, require human approval for anything destructive, cap spend outside the model, and run risky work in a sandbox. Regex blocklists help as a tripwire but are easy to evade, so never rely on them alone."
+description: "A practical, honest guide to securing AI coding agents that use the Model Context Protocol (MCP): least privilege, approvals, spend caps, sandboxes — and what a small open-source policy gate like AegisMCP can and cannot do."
 category: "ai-engineering"
 date: "2026-06-21"
-keyStat: "AegisMCP introduces hardcoded pre execution token budgeting and semantic filtering, keeping your unit economics safe from runaway agent automation loops."
+updated: "2026-10-30"
+author: "Algoroasts Editorial"
+keyStat: "Prompt injection is ranked LLM01 — the top risk — in the OWASP Top 10 for LLM Applications 2025, and unbounded consumption (runaway cost) is listed as LLM10."
+tags: ["mcp security", "ai agent guardrails", "prompt injection", "claude desktop mcp", "llm cost control", "ai-engineering"]
+related: ["ai-agent-developer-india-2026", "eu-ai-act-developer-guide-2026", "eu-ai-engineer-skills-2026", "gdpr-privacy-engineering-2026"]
+sources:
+  - label: "OWASP Top 10 for LLM Applications 2025 (OWASP GenAI Security Project)"
+    url: "https://genai.owasp.org/resource/owasp-top-10-for-llm-applications-2025/"
+  - label: "Model Context Protocol — official documentation"
+    url: "https://modelcontextprotocol.io/"
+  - label: "AegisMCP source code (MIT licence)"
+    url: "https://github.com/thekartikeyamishra/AegisMCP"
 ---
 
-The developer ecosystem is undergoing a seismic shift. With the rapid adoption of the **Model Context Protocol (MCP)**, AI coding assistants have evolved from simple chat interfaces into autonomous, agentic systems. Tools like Claude Desktop and Cursor can now read local databases, execute terminal commands, and modify entire codebases.
+> **Disclosure:** AegisMCP is an open-source prototype built by the founder of Algoroasts. We describe exactly what its current code does — including its limits — so you can judge it fairly. We earn nothing from it.
 
-However, there is a terrifying blind spot that the industry is largely ignoring: **AI agents are unmonitored black boxes.**
-
-When deploying scalable platforms or working on enterprise codebases, exposing your local environment to an autonomous LLM introduces two critical vulnerabilities:
+AI coding assistants that speak the **Model Context Protocol (MCP)** can now read files, run terminal commands and call APIs on your behalf. That is powerful, and it changes the security question from "is the model's answer correct?" to "what can this agent *do* if it is wrong — or if someone tricks it?"
 
 <KeyTakeaways items={[
-  "AI agents can trigger financial blackholes via infinite, runaway tool loops if left unmanaged.",
-  "Malicious repositories or prompt injections can force agents to run destructive system commands.",
-  "AegisMCP provides an impenetrable proxy firewall layer that maps costs and scans strings pre-execution.",
-  "Built with a Next.js frontend and local Express server, it delivers zero-latency zero-trust security."
+  "Prompt injection is the #1 risk in the OWASP Top 10 for LLM Applications 2025; runaway cost (unbounded consumption) is #10.",
+  "The strongest control is least privilege: expose the fewest MCP tools and folders the task needs.",
+  "Require a human click for destructive actions, and enforce budgets outside the model, not in the prompt.",
+  "Regex blocklists are a useful tripwire but trivially bypassed — combine them with sandboxes and approvals.",
+  "AegisMCP is a small MIT-licensed MCP server that demonstrates a blocklist plus a spend ledger; it is a learning example, not a complete firewall."
 ]} />
 
-## The Hidden Vulnerabilities of Autonomous AI Workflows
+## The two failure modes that matter
 
-1. **The Financial Blackhole (Runaway LLM Costs):** An AI agent hallucinating and getting stuck in an infinite tool-calling loop can drain thousands of dollars in Anthropic or OpenAI API credits overnight, destroying your project's unit economics.
-2. **Catastrophic Data Exfiltration & Deletion:** A simple prompt injection attack hidden inside a malicious open-source repository or NPM package can trick your AI into executing a `DROP TABLE` or `rm -rf` command on your machine.
+**1. The agent does something destructive.** A model can misread an instruction, or follow instructions hidden inside a file, web page or dependency it was asked to read (indirect prompt injection). If the agent has a shell, "clean up the build folder" and "delete the repo" are one bad path away.
 
-To maintain high net profit margins and bulletproof DevSecOps, you cannot rely on an LLM to police itself. That is why we built **AegisMCP**.
+**2. The agent burns money.** Agents loop. A tool call that fails, retries and re-plans can run for hours against a paid API. OWASP files this under *unbounded consumption*: the cost is real even when nothing is "hacked".
+
+## Controls, from strongest to weakest
+
+| Control | What it stops | Bypass risk |
+|---|---|---|
+| Least privilege (only the tools and folders a task needs) | Most damage, by removing the capability | Low |
+| Sandboxing (container, VM or throwaway workspace) | Damage to your real machine and secrets | Low |
+| Human approval for writes, deletes, deploys and payments | Destructive actions slipping through | Low, if you actually read the request |
+| Spend caps enforced by the API provider or a proxy | Runaway cost | Low |
+| Allowlists of permitted commands | Unexpected commands | Medium |
+| Blocklists / pattern matching | Known-bad strings | High — easy to rephrase or encode |
+
+The pattern is clear: **controls that remove capability beat controls that try to recognise bad intent.** A model cannot delete a folder it was never given access to.
 
 <InArticleAd />
 
----
+## A minimal policy gate: how AegisMCP works today
 
-## Introducing AegisMCP: The Zero-Trust AI Proxy
+[AegisMCP](https://github.com/thekartikeyamishra/AegisMCP) is a small monorepo with an MCP server (stdio transport) and a Next.js dashboard. Its current server code is short enough to describe completely:
 
-[AegisMCP](https://github.com/thekartikeyamishra/AegisMCP/tree/main) is a local-first security proxy and real-time visual dashboard. It sits directly between your AI agent and your execution environment (filesystem, terminal, or cloud APIs). 
+- It registers **one tool, `secure-execute`**, which takes a text payload.
+- Each payload is checked against a **blocklist of three patterns**: `rm -rf`, `chmod 777` and the phrase "ignore previous instructions". A match returns a "SECURITY HALT" error.
+- Each allowed call is charged a **flat notional cost** (USD 0.005, multiplied by a 1.30 markup) against a **daily budget ledger** (USD 5.00 by default) stored in a local JSON file. When the ledger is full, calls return "FINANCIAL HALT".
 
-Every time Claude or Cursor attempts to use a tool, AegisMCP intercepts the request, scans it for threats, calculates the financial cost, and requires explicit human approval for destructive actions[cite: 1].
+What that means in practice:
 
-### 🛡️ Core Enterprise Protections
+- It guards **only the calls an agent sends through its own tool.** It does not sit in front of your agent's other MCP servers or built-in tools, so it is not a transparent firewall for everything Claude Desktop or Cursor can do.
+- The cost figure is a **fixed estimate per call**, not a measurement of real token usage.
+- Three regex patterns are a **demonstration**, not coverage: `rm  -rf` with two spaces, a script file, or base64 would pass.
 
-#### 1. Hardcoded Financial Guardrails (API Cost Control)
-Stop runaway AI loops before they burn your budget[cite: 1]. AegisMCP acts as a strict financial ledger[cite: 1]. You set a daily API budget limit (e.g., $15.00/day)[cite: 1]. The firewall calculates the estimated token cost of every request *before* it hits the execution environment[cite: 1]. If an agent tries to exceed your budget, Aegis severs the connection instantly[cite: 1]. 
+That makes it a good, readable starting point for learning how an MCP policy gate is wired — and a reminder of why the stronger controls above matter.
 
-#### 2. Semantic Threat Interception (Anti-Prompt Injection)
-Aegis applies advanced regex pattern matching to block known AI jailbreaks and prompt injection attacks[cite: 1]. It actively intercepts destructive commands like:
-* `rm -rf /` (Recursive system deletion)[cite: 1]
-* `kubectl delete all` (DevOps sabotage)[cite: 1]
-* Exfiltration of `.env` variables via `curl` payloads[cite: 1]
-
-#### 3. Real-Time Visual Dashboard (Next.js)
-Terminal logs are noisy and increase cognitive load[cite: 1]. Aegis ships with a stunning, low-latency **Next.js dashboard**[cite: 1]. It uses psychological UI/UX design principles—flashing red for dangerous write actions and green for safe read actions—allowing you to monitor your agent’s behavior instantly[cite: 1].
-
----
-
-## Quick Start: Secure Claude & Cursor in 60 Seconds
-
-We engineered Aegis for frictionless integration[cite: 1]. You can establish your zero-trust architecture immediately[cite: 1].
-
-### Step 1: Install the Monorepo
-Pull the source code from the official GitHub repository and install the dependencies[cite: 1].
+### Trying it locally
 
 ```bash
-git clone [https://github.com/thekartikeyamishra/AegisMCP.git](https://github.com/thekartikeyamishra/AegisMCP.git)
+git clone https://github.com/thekartikeyamishra/AegisMCP.git
 cd AegisMCP
 npm install
 npm run dev
-
-If the exact same error persists, `gray-matter` is failing to parse the YAML metadata section altogether. This usually happens when the parser chokes on the multi-line nested array indentation under `sources:` or inline formatting arrays.
-
-Let's solve this permanently by **completely flattening the frontmatter metadata header**. We will completely remove all complex structures (like arrays, tags, related items, and nested sources links) out of the frontmatter config zone and move them into the markdown body content. This leaves the parser with only flat, basic key-value text strings that can never break.
-
-Completely overwrite `content/posts/zero-trust-firewall-ai-agents-aegismcp.mdx` with this block:
-
-```mdx
----
-title: "The Zero Trust Firewall for AI Agents Securing Claude and Cursor"
-answer: "Granting autonomous AI coding agents unrestricted access to your local filesystem or cloud APIs is a massive security risk. AegisMCP is an open source zero trust security gateway that intercepts dangerous commands and enforces strict financial API budgets before execution."
-description: "Protect your local filesystem, secure your API keys, and stop runaway LLM API costs with AegisMCP, the ultimate zero trust Model Context Protocol proxy for developers."
-category: "ai-engineering"
-date: "2026-06-21"
-keyStat: "AegisMCP introduces hardcoded pre execution token budgeting and semantic filtering, keeping your unit economics safe from runaway agent automation loops."
----
-
-The developer ecosystem is undergoing a seismic shift[cite: 1]. With the rapid adoption of the **Model Context Protocol (MCP)**, AI coding assistants have evolved from simple chat interfaces into autonomous, agentic systems[cite: 1]. Tools like Claude Desktop and Cursor can now read local databases, execute terminal commands, and modify entire codebases[cite: 1].
-
-However, there is a terrifying blind spot that the industry is largely ignoring: **AI agents are unmonitored black boxes.**[cite: 1]
-
-When deploying scalable platforms or working on enterprise codebases, exposing your local environment to an autonomous LLM introduces two critical vulnerabilities[cite: 1]:
-
-<KeyTakeaways items={[
-  "AI agents can trigger financial blackholes via infinite, runaway tool loops if left unmanaged.",
-  "Malicious repositories or prompt injections can force agents to run destructive system commands.",
-  "AegisMCP provides an impenetrable proxy firewall layer that maps costs and scans strings pre-execution.",
-  "Built with a Next.js frontend and local Express server, it delivers zero-latency zero-trust security."
-]} />
-
-## The Hidden Vulnerabilities of Autonomous AI Workflows
-
-1. **The Financial Blackhole (Runaway LLM Costs):** An AI agent hallucinating and getting stuck in an infinite tool-calling loop can drain thousands of dollars in Anthropic or OpenAI API credits overnight, destroying your project's unit economics[cite: 1].
-2. **Catastrophic Data Exfiltration & Deletion:** A simple prompt injection attack hidden inside a malicious open-source repository or NPM package can trick your AI into executing a `DROP TABLE` or `rm -rf` command on your machine[cite: 1].
-
-To maintain high net profit margins and bulletproof DevSecOps, you cannot rely on an LLM to police itself[cite: 1]. That is why we built **AegisMCP**[cite: 1].
-
-<InArticleAd />
-
----
-
-## Introducing AegisMCP: The Zero-Trust AI Proxy
-
-[AegisMCP](https://github.com/thekartikeyamishra/AegisMCP/tree/main) is a local-first security proxy and real-time visual dashboard[cite: 1]. It sits directly between your AI agent and your execution environment (filesystem, terminal, or cloud APIs)[cite: 1]. 
-
-Every time Claude or Cursor attempts to use a tool, AegisMCP intercepts the request, scans it for threats, calculates the financial cost, and requires explicit human approval for destructive actions[cite: 1].
-
-### 🛡️ Core Enterprise Protections
-
-#### 1. Hardcoded Financial Guardrails (API Cost Control)
-Stop runaway AI loops before they burn your budget[cite: 1]. AegisMCP acts as a strict financial ledger[cite: 1]. You set a daily API budget limit (e.g., $15.00/day)[cite: 1]. The firewall calculates the estimated token cost of every request *before* it hits the execution environment[cite: 1]. If an agent tries to exceed your budget, Aegis severs the connection instantly[cite: 1]. 
-
-#### 2. Semantic Threat Interception (Anti-Prompt Injection)
-Aegis applies advanced regex pattern matching to block known AI jailbreaks and prompt injection attacks[cite: 1]. It actively intercepts destructive commands like:
-* `rm -rf /` (Recursive system deletion)[cite: 1]
-* `kubectl delete all` (DevOps sabotage)[cite: 1]
-* Exfiltration of `.env` variables via `curl` payloads[cite: 1]
-
-#### 3. Real-Time Visual Dashboard (Next.js)
-Terminal logs are noisy and increase cognitive load[cite: 1]. Aegis ships with a stunning, low-latency **Next.js dashboard**[cite: 1]. It uses psychological UI/UX design principles—flashing red for dangerous write actions and green for safe read actions—allowing you to monitor your agent’s behavior instantly[cite: 1].
-
----
-
-## Quick Start: Secure Claude & Cursor in 60 Seconds
-
-We engineered Aegis for frictionless integration[cite: 1]. You can establish your zero-trust architecture immediately[cite: 1].
-
-### Step 1: Install the Monorepo
-Pull the source code from the official GitHub repository and install the dependencies[cite: 1].
-
-```bash
-git clone [https://github.com/thekartikeyamishra/AegisMCP.git](https://github.com/thekartikeyamishra/AegisMCP.git)
-cd AegisMCP
-npm install
-npm run dev
-
 ```
 
-### Step 2: Connect Claude Desktop
-
-Open your Claude Desktop configuration file and route your tools through the Aegis proxy.
-
-**Config Path:**
-
-* **Mac:** `~/Library/Application Support/Claude/claude_desktop_config.json`
-
-* **Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
-
+Then register the server in Claude Desktop's `claude_desktop_config.json` (macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`; Windows: `%APPDATA%\Claude\claude_desktop_config.json`), pointing at the built CLI:
 
 ```json
 {
@@ -163,49 +87,26 @@ Open your Claude Desktop configuration file and route your tools through the Aeg
     }
   }
 }
-
 ```
 
-### Step 3: Connect Cursor AI
+Restart the app after editing the file. Cursor and other MCP clients accept the same `command` + `args` pair in their MCP server settings.
 
-1. Open Cursor Settings > **Features** > **MCP Servers**.
+## A sensible setup for real projects
 
+1. **Start read-only.** Give the agent read access to the project folder only. Add write access per task.
+2. **Never mount your home directory, SSH keys or `.env` files.** Use a dedicated workspace or container.
+3. **Keep approvals on** for shell commands, file deletion, git push and anything that costs money.
+4. **Set a hard monthly limit in your AI provider's billing console** — that limit holds even if every other layer fails.
+5. **Log every tool call** so you can see what happened after the fact.
+6. **Add pattern checks last**, as an extra tripwire, not as the wall.
 
-2. Click **+ Add New MCP Server**.
-
-
-3. Name it `AegisFirewall`.
-
-
-4. Set the command to `node` and the argument to the absolute path of `packages/cli/dist/index.js`.
-
-
-5. Click Save. Cursor will now route all system calls through Aegis securely.
-
-
-
----
-
-## Why Open-Source Security is the Future of AI
-
-Security through obscurity does not work with Large Language Models. By open-sourcing the core of AegisMCP, security engineers and systems architects worldwide can contribute new Regex threat signatures, keeping the firewall updated against the latest zero-day prompt injection techniques.
-
-Whether you are an independent developer protecting your local Windows/Mac machine or an enterprise scaling a fleet of autonomous web agents, AegisMCP ensures your unit economics stay green and your IP stays secure.
-
-## Sources
-
-* [AegisMCP Open Source Repository on GitHub](https://github.com/thekartikeyamishra/AegisMCP/tree/main)
-* [Algoroasts Developer Platform](https://algoroasts.com/)
+If you build AI features for EU users, these controls also map onto the record-keeping and human-oversight themes in our [EU AI Act guide for developers](/blog/eu-ai-act-developer-guide-2026).
 
 <FAQ items={[
-{ question: "What is AegisMCP?", answer: "AegisMCP is a zero-trust proxy server and Next.js visual dashboard designed to intercept tool calls from AI agents like Claude and Cursor, safeguarding filesystems and preventing cost overruns." },
-{ question: "How does it protect my API budget?", answer: "It evaluates the token size and cost parameters of a request before allowing the execution loop to proceed, applying hard limit cutoffs if budgets are breached." },
-{ question: "Can I use it on web applications?", answer: "Yes. In addition to stdio transport for local tools, it supports Server-Sent Events (SSE) over HTTP to secure cloud or web-based workflows seamlessly." }
+  { question: "What is the biggest security risk with AI coding agents?", answer: "Prompt injection — instructions hidden in content the agent reads — ranked first in the OWASP Top 10 for LLM Applications 2025. Combined with broad tool access, it can turn a helpful agent into a destructive one." },
+  { question: "Can a regex blocklist make an AI agent safe?", answer: "No. Blocklists catch known strings but are easy to evade by rephrasing, spacing or encoding a command. Use least privilege, sandboxes and human approval first, and treat pattern matching as an extra tripwire." },
+  { question: "How do I stop an AI agent from running up a huge API bill?", answer: "Set a hard spending limit in your AI provider's billing settings, add per-task budgets in any proxy you control, and watch for loops in your logs. Limits enforced outside the model are the ones that hold." },
+  { question: "Does AegisMCP protect all of Claude Desktop's or Cursor's tools?", answer: "Not in its current version. It is an MCP server exposing a single guarded tool with a three-pattern blocklist and a flat-cost budget ledger. It only checks calls routed through that tool." }
 ]} />
 
-```
-
-### 🚨 Crucial Check When Pasting:
-Make absolutely certain that the very first line of your file is `---`[cite: 5]. There can be **no blank lines or spaces** sitting above it on Line 1[cite: 5]. Save the file, and your development compilation server will hot-reload cleanly.
-
-```
+The safest agent is the one that simply cannot reach what you can't afford to lose. Remove capabilities first, add approvals second, and treat clever detection as a bonus.

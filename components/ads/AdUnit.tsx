@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react';
 import { usePathname } from 'next/navigation';
 import { SITE } from '@/lib/site';
 import { cn } from '@/lib/utils';
+import { AD_FREE_PATHS } from './slots';
 
 declare global {
   interface Window {
@@ -12,26 +13,24 @@ declare global {
 }
 
 interface AdUnitProps {
-  /** The ad slot ID from your AdSense dashboard (data-ad-slot). */
+  /** The ad slot ID from your AdSense dashboard (data-ad-slot). Empty → renders nothing. */
   slot: string;
-  /** Layout format. "auto" = responsive display; "fluid" = in-article/in-feed. */
   format?: 'auto' | 'fluid' | 'autorelaxed';
   layout?: string;
   layoutKey?: string;
   responsive?: boolean;
   className?: string;
-  /** Optional label shown above the ad (transparency improves trust + CTR). */
-  label?: string;
+  /** Reserved height (px) so the ad never pushes content around (CLS). */
+  minHeight?: number;
   style?: React.CSSProperties;
 }
 
 /**
- * Single AdSense slot. Safe to render many per page.
- *
- * Why a ref + try/catch: AdSense throws if `push({})` runs before the script
- * loads or if a slot is pushed twice (common on client navigation). We guard
- * both. `key={pathname}` on the parent forces a fresh mount per route so the
- * SPA-style navigation in Next.js still fills slots correctly.
+ * One manual AdSense slot.
+ *  - Renders nothing without a real slot ID or on ad-free routes.
+ *  - Reserves space up front → no layout shift.
+ *  - Pushes once per mount; the wrapper is keyed by route so client navigation refills it.
+ *  - Clearly labelled "Advertisement" (allowed by AdSense; improves trust).
  */
 export function AdUnit({
   slot,
@@ -40,43 +39,48 @@ export function AdUnit({
   layoutKey,
   responsive = true,
   className,
-  label = 'Advertisement',
+  minHeight = 280,
   style,
 }: AdUnitProps) {
   const pathname = usePathname();
-  const pushed = useRef(false);
+  const insRef = useRef<HTMLModElement>(null);
+  const disabled = !slot || AD_FREE_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 
   useEffect(() => {
-    pushed.current = false;
-  }, [pathname]);
-
-  useEffect(() => {
-    if (pushed.current) return;
+    if (disabled) return;
+    const el = insRef.current;
+    if (!el || el.getAttribute('data-adsbygoogle-status')) return;
     try {
       (window.adsbygoogle = window.adsbygoogle || []).push({});
-      pushed.current = true;
     } catch {
-      // Script not ready yet or slot already filled — silently ignore.
+      // Script blocked or not ready — fail silently; the reserved space just stays empty.
     }
-  });
+  }, [disabled, pathname]);
+
+  if (disabled) return null;
 
   return (
-    <div className={cn('not-prose my-8 text-center', className)} key={pathname}>
-      {label && (
-        <span className="mb-1 block text-[11px] font-medium uppercase tracking-widest text-slate-400">
-          {label}
-        </span>
-      )}
-      <ins
-        className="adsbygoogle block"
-        style={{ display: 'block', ...style }}
-        data-ad-client={SITE.adsenseClient}
-        data-ad-slot={slot}
-        data-ad-format={format}
-        {...(layout && { 'data-ad-layout': layout })}
-        {...(layoutKey && { 'data-ad-layout-key': layoutKey })}
-        data-full-width-responsive={responsive ? 'true' : 'false'}
-      />
-    </div>
+    <aside
+      key={pathname}
+      className={cn('not-prose mx-auto my-10 w-full max-w-3xl', className)}
+      aria-label="Advertisement"
+    >
+      <span className="mb-1.5 block text-center text-[10px] font-medium uppercase tracking-[0.2em] text-faint">
+        Advertisement
+      </span>
+      <div className="overflow-hidden rounded-2xl" style={{ minHeight }}>
+        <ins
+          ref={insRef}
+          className="adsbygoogle"
+          style={{ display: 'block', ...style }}
+          data-ad-client={SITE.adsenseClient}
+          data-ad-slot={slot}
+          data-ad-format={format}
+          {...(layout && { 'data-ad-layout': layout })}
+          {...(layoutKey && { 'data-ad-layout-key': layoutKey })}
+          data-full-width-responsive={responsive ? 'true' : 'false'}
+        />
+      </div>
+    </aside>
   );
 }

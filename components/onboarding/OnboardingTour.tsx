@@ -6,8 +6,7 @@ import { ArrowRight, ArrowLeft, X, Flame, Target, Bookmark, Compass } from 'luci
 /**
  * ONBOARDING TOUR
  * ---------------
- * Shows once on first visit (localStorage flag) to teach a new user what the
- * platform is and how to use it. Re-openable anytime via a custom event:
+ * Explains the platform when the user asks for it, via a custom event:
  *   window.dispatchEvent(new Event('algoroasts:open-tour'))
  * (the "How it works" button in the Navbar fires this).
  *
@@ -27,7 +26,7 @@ const STEPS: Step[] = [
   {
     icon: <Compass className="h-6 w-6" />,
     title: 'Welcome to Algoroasts',
-    body: 'This is a Developer Decision Intelligence platform — not a blog. General AI tells you what exists. We synthesize real market data into one clear directive: what to do next.',
+    body: 'Algoroasts helps developers make career decisions — offers, rates, relocation, skills — using official data and free calculators. Every guide ends in a clear recommendation you can check against its sources.',
   },
   {
     icon: <Target className="h-6 w-6" />,
@@ -42,7 +41,7 @@ const STEPS: Step[] = [
   {
     icon: <Flame className="h-6 w-6" />,
     title: 'Build a streak, find your next move',
-    body: 'Check back as the market shifts and your day-streak grows. Use the top nav to explore Intelligence, Roadmaps, search, and switch between light and dark — top right.',
+    body: 'Check back as the market shifts and your day-streak grows. Use Tools for the calculators, Intelligence for the guides, and switch light or dark mode at the top right.',
   },
 ];
 
@@ -59,27 +58,9 @@ export function OnboardingTour() {
     }
   }, []);
 
-  // First-visit auto-open + manual re-open listener.
+  // Opens only on request ("How it works"). No auto-popup on first visit: interstitials on
+  // landing hurt bounce rate, Core Web Vitals and Google's intrusive-interstitial guidance.
   useEffect(() => {
-    let seen = false;
-    try {
-      seen = window.localStorage.getItem(SEEN_KEY) === '1';
-    } catch {
-      seen = true; // storage blocked — don't nag
-    }
-    if (!seen) {
-      const t = setTimeout(() => setOpen(true), 700);
-      // cleanup below also clears this
-      const reopen = () => {
-        setStep(0);
-        setOpen(true);
-      };
-      window.addEventListener('algoroasts:open-tour', reopen);
-      return () => {
-        clearTimeout(t);
-        window.removeEventListener('algoroasts:open-tour', reopen);
-      };
-    }
     const reopen = () => {
       setStep(0);
       setOpen(true);

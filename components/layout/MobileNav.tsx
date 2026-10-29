@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Newspaper, Map, Info } from 'lucide-react';
+import { Home, Newspaper, Calculator, Sparkles } from 'lucide-react';
 import { haptic } from '@/lib/utils';
 
 /**
@@ -11,9 +11,9 @@ import { haptic } from '@/lib/utils';
  */
 const ITEMS = [
   { href: '/', label: 'Home', icon: Home },
+  { href: '/tools', label: 'Tools', icon: Calculator },
   { href: '/blog', label: 'Intel', icon: Newspaper },
-  { href: '/roadmaps', label: 'Roadmaps', icon: Map },
-  { href: '/about', label: 'About', icon: Info },
+  { href: '/invite', label: 'Invite', icon: Sparkles },
 ];
 
 export function MobileNav() {
@@ -24,7 +24,7 @@ export function MobileNav() {
 
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface/90 backdrop-blur-md md:hidden"
+      className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface/90 pb-[env(safe-area-inset-bottom)] backdrop-blur-md md:hidden"
       aria-label="Primary"
     >
       <ul className="mx-auto flex max-w-md items-stretch justify-around">

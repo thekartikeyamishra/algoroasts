@@ -36,6 +36,12 @@ npm run lint       # ESLint
 
 ---
 
+## Launching / AdSense
+
+Read [`docs/LAUNCH_CHECKLIST.md`](./docs/LAUNCH_CHECKLIST.md): env vars, Search Console, AdSense
+consent message + Auto ads, the revenue maths and the backlink plan. Track progress toward the ad
+revenue goal with `node scripts/revenue-goal.mjs --pages <Search Console Pages.csv> --rpm <your RPM>`.
+
 ## What's wired in
 
 - **SEO/GEO/LLM:** auto `sitemap.xml` + `robots.txt` (explicitly allows GPTBot, PerplexityBot,

@@ -1,9 +1,12 @@
 import type { Metadata, Viewport } from 'next';
-import Script from 'next/script';
+// Self-hosted fonts (bundled + served from our own domain: no third-party request, no render-blocking CSS).
+import '@fontsource-variable/plus-jakarta-sans/wght.css';
+import '@fontsource/jetbrains-mono/latin-400.css';
+import '@fontsource/jetbrains-mono/latin-500.css';
 import './globals.css';
 import { SITE } from '@/lib/site';
 import { buildMetadata } from '@/lib/seo';
-import { organizationSchema, websiteSchema } from '@/lib/schema';
+import { organizationSchema, websiteSchema, founderSchema } from '@/lib/schema';
 import { JsonLd } from '@/components/JsonLd';
 import { Navbar } from '@/components/layout/Navbar';
 import { Footer } from '@/components/layout/Footer';
@@ -12,6 +15,7 @@ import { HookProvider } from '@/components/hook/HookProvider';
 import { ThemeProvider } from '@/components/theme/ThemeProvider';
 import { OnboardingTour } from '@/components/onboarding/OnboardingTour';
 import { ScrollToTop } from '@/components/ui/ScrollToTop';
+import { Interactions } from '@/components/fx/Interactions';
 
 export const metadata: Metadata = buildMetadata();
 
@@ -22,6 +26,7 @@ export const viewport: Viewport = {
   ],
   width: 'device-width',
   initialScale: 1,
+  viewportFit: 'cover',
 };
 
 /**
@@ -42,32 +47,31 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
-        {/* Fonts via <link> (build-safe). CSS vars defined in globals.css. */}
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          rel="stylesheet"
-          href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap"
+        {/* Google AdSense — the exact snippet AdSense issued. Async: never blocks rendering. */}
+        <script
+          async
+          src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${SITE.adsenseClient}`}
+          crossOrigin="anonymous"
         />
-        <JsonLd data={[organizationSchema(), websiteSchema()]} />
+        <link rel="preconnect" href="https://pagead2.googlesyndication.com" crossOrigin="anonymous" />
+        <JsonLd data={[organizationSchema(), founderSchema(), websiteSchema()]} />
       </head>
       <body className="flex min-h-screen flex-col font-sans">
-        {/* Google AdSense site-level loader — lazy, after interactive. Earns from day one. */}
-        <Script
-          id="adsbygoogle-init"
-          async
-          strategy="afterInteractive"
-          crossOrigin="anonymous"
-          src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${SITE.adsenseClient}`}
-        />
+        <a
+          href="#main"
+          className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[200] focus:rounded-full focus:bg-brand-600 focus:px-4 focus:py-2 focus:text-white"
+        >
+          Skip to content
+        </a>
         <ThemeProvider>
           <HookProvider>
             <Navbar />
-            <main className="flex-1 pb-16 md:pb-0">{children}</main>
+            <main id="main" className="flex-1 pb-16 md:pb-0">{children}</main>
             <Footer />
             <MobileNav />
             <ScrollToTop />
             <OnboardingTour />
+            <Interactions />
           </HookProvider>
         </ThemeProvider>
       </body>

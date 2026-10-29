@@ -15,7 +15,7 @@ interface BuildMetaArgs {
 
 /**
  * Centralized metadata builder. Every page calls this so canonical URLs,
- * Open Graph, and Twitter cards stay consistent and correct.
+ * Open Graph, Twitter cards and the AdSense verification tag stay consistent.
  */
 export function buildMetadata({
   title,
@@ -28,7 +28,7 @@ export function buildMetadata({
   tags,
   noIndex = false,
 }: BuildMetaArgs = {}): Metadata {
-  const fullTitle = title ? `${title} | ${SITE.name}` : `${SITE.name} — Developer Decision Intelligence`;
+  const fullTitle = title ? `${title} | ${SITE.name}` : `${SITE.name} — Developer Career Decisions, Backed by Data`;
   const canonical = absoluteUrl(path);
   const ogImage = absoluteUrl(image ?? '/og/default.png');
 
@@ -36,18 +36,27 @@ export function buildMetadata({
     title: fullTitle,
     description,
     metadataBase: new URL(SITE.url),
+    applicationName: SITE.name,
+    authors: [{ name: SITE.founder.name, url: absoluteUrl('/about') }],
+    creator: SITE.founder.name,
+    publisher: SITE.name,
     alternates: { canonical },
     icons: {
       icon: [
         { url: '/favicon.ico', sizes: '48x48' },
+        { url: '/favicon.svg', type: 'image/svg+xml' },
         { url: '/favicon-32.png', sizes: '32x32', type: 'image/png' },
         { url: '/favicon-16.png', sizes: '16x16', type: 'image/png' },
       ],
       apple: [{ url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' }],
     },
     robots: noIndex
-      ? { index: false, follow: false }
-      : { index: true, follow: true, 'max-image-preview': 'large', 'max-snippet': -1 },
+      ? { index: false, follow: true }
+      : {
+          index: true,
+          follow: true,
+          googleBot: { index: true, follow: true, 'max-image-preview': 'large', 'max-snippet': -1, 'max-video-preview': -1 },
+        },
     openGraph: {
       type,
       url: canonical,
@@ -65,5 +74,7 @@ export function buildMetadata({
       images: [ogImage],
       creator: '@kartikeyahere',
     },
+    // AdSense site-ownership verification (the exact tag AdSense asked for).
+    other: { 'google-adsense-account': SITE.adsenseClient },
   };
 }

@@ -24,12 +24,12 @@ export function Navbar() {
   return (
     <nav className="sticky top-0 z-50 border-b border-line bg-surface/80 backdrop-blur-md">
       <div className="container-x flex h-16 items-center justify-between">
-        <Link href="/" className="flex items-center gap-2" aria-label={`${SITE.name} home`}>
+        <Link href="/" className="group flex items-center gap-2" aria-label={`${SITE.name} home`}>
           <span className="text-2xl transition group-hover:scale-110" aria-hidden>🔥</span>
           <span className="text-xl font-bold tracking-tight text-ink">{SITE.name}</span>
         </Link>
 
-        <div className="hidden items-center gap-7 md:flex">
+        <div className="hidden items-center gap-6 md:flex">
           {NAV_LINKS.map((link) => (
             <Link
               key={link.href}
@@ -55,6 +55,12 @@ export function Navbar() {
             <HelpCircle className="h-4 w-4" /> How it works
           </button>
           <ThemeToggle />
+          <Link
+            href="/invite"
+            className="inline-flex h-9 items-center rounded-full bg-ink px-4 text-sm font-semibold text-canvas transition hover:opacity-90 active:scale-95"
+          >
+            Request invite
+          </Link>
         </div>
 
         <div className="flex items-center gap-2 md:hidden">
@@ -94,6 +100,13 @@ export function Navbar() {
           >
             <HelpCircle className="h-4 w-4" /> How it works
           </button>
+          <Link
+            href="/invite"
+            onClick={() => setOpen(false)}
+            className="mt-1 rounded-lg bg-ink px-3 py-2.5 text-center text-sm font-semibold text-canvas"
+          >
+            Request an invite
+          </Link>
           <div className="px-3 py-2">
             <StreakBadge />
           </div>

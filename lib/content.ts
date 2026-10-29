@@ -38,6 +38,7 @@ export interface Post {
   frontmatter: PostFrontmatter;
   content: string;
   readingTimeMinutes: number;
+  wordCount: number;
 }
 
 function validateFrontmatter(data: Record<string, unknown>, slug: string): PostFrontmatter {
@@ -66,20 +67,58 @@ export function getPostBySlug(slug: string): Post {
   const raw = fs.readFileSync(fullPath, 'utf8');
   const { data, content } = matter(raw);
   const frontmatter = validateFrontmatter(data, slug);
+  const stats = readingTime(content);
   return {
     slug,
     frontmatter,
     content,
-    readingTimeMinutes: Math.max(1, Math.round(readingTime(content).minutes)),
+    readingTimeMinutes: Math.max(1, Math.round(stats.minutes)),
+    wordCount: stats.words,
   };
 }
 
-/** All non-draft posts, newest first. */
+/** Lightweight card data for listings (no MDX body shipped to the client). */
+export interface PostCard {
+  slug: string;
+  title: string;
+  description: string;
+  category: CategorySlug;
+  date: string;
+  updated?: string;
+  readingTimeMinutes: number;
+  tags: string[];
+}
+
+export function toCard(post: Post): PostCard {
+  return {
+    slug: post.slug,
+    title: post.frontmatter.title,
+    description: post.frontmatter.description,
+    category: post.frontmatter.category,
+    date: post.frontmatter.date,
+    updated: post.frontmatter.updated,
+    readingTimeMinutes: post.readingTimeMinutes,
+    tags: post.frontmatter.tags ?? [],
+  };
+}
+
+/** Number of distinct primary sources cited across all published posts (real, computed). */
+export function countDistinctSources(): number {
+  const urls = new Set<string>();
+  for (const p of getAllPosts()) for (const s of p.frontmatter.sources ?? []) urls.add(s.url);
+  return urls.size;
+}
+
+let cache: Post[] | null = null;
+
+/** All non-draft posts, newest first. Memoized per process (posts are static files). */
 export function getAllPosts(): Post[] {
-  return getPostSlugs()
+  if (cache && process.env.NODE_ENV === 'production') return cache;
+  cache = getPostSlugs()
     .map((slug) => getPostBySlug(slug))
     .filter((post) => !post.frontmatter.draft)
-    .sort((a, b) => +new Date(b.frontmatter.date) - +new Date(a.frontmatter.date));
+    .sort((a, b) => +new Date(b.frontmatter.updated ?? b.frontmatter.date) - +new Date(a.frontmatter.updated ?? a.frontmatter.date));
+  return cache;
 }
 
 export function getPostsByCategory(category: CategorySlug): Post[] {
